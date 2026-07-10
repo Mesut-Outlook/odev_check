@@ -6,6 +6,7 @@ import cors from 'cors';
 import multer from 'multer';
 import * as storage from './storage.js';
 import * as aiClient from './openaiClient.js';
+import { generateHomeworkPDF } from './pdfService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -52,9 +53,37 @@ function createApp(overrides = {}) {
   app.post(
     '/api/students',
     asyncHandler(async (req, res) => {
-      const { name } = req.body || {};
-      const student = await storage.createStudent(name);
+      const { name, phone } = req.body || {};
+      const student = await storage.createStudent(name, phone);
       res.status(201).json(student);
+    })
+  );
+
+  app.put(
+    '/api/students/:studentId',
+    asyncHandler(async (req, res) => {
+      const { studentId } = req.params;
+      const { name, phone } = req.body || {};
+      const student = await storage.updateStudent(studentId, { name, phone });
+      res.status(200).json(student);
+    })
+  );
+
+  app.post(
+    '/api/students/:studentId/archive',
+    asyncHandler(async (req, res) => {
+      const { studentId } = req.params;
+      const student = await storage.toggleArchiveStudent(studentId);
+      res.status(200).json(student);
+    })
+  );
+
+  app.delete(
+    '/api/students/:studentId',
+    asyncHandler(async (req, res) => {
+      const { studentId } = req.params;
+      await storage.deleteStudent(studentId);
+      res.status(200).json({ success: true });
     })
   );
 
@@ -117,6 +146,24 @@ function createApp(overrides = {}) {
     })
   );
 
+  app.delete(
+    '/api/evaluations/:studentId/:homeworkId',
+    asyncHandler(async (req, res) => {
+      const { studentId, homeworkId } = req.params;
+      await storage.deleteHomework(studentId, homeworkId);
+      res.status(200).json({ success: true });
+    })
+  );
+
+  app.delete(
+    '/api/evaluations/:studentId',
+    asyncHandler(async (req, res) => {
+      const { studentId } = req.params;
+      await storage.clearAllHomeworks(studentId);
+      res.status(200).json({ success: true });
+    })
+  );
+
   app.get(
     '/api/evaluations/:studentId/:homeworkId',
     asyncHandler(async (req, res) => {
@@ -133,6 +180,39 @@ function createApp(overrides = {}) {
         throw cause;
       }
       res.status(200).json(record);
+    })
+  );
+
+  app.get(
+    '/api/evaluations/:studentId/:homeworkId/pdf',
+    asyncHandler(async (req, res) => {
+      const { studentId, homeworkId } = req.params;
+      const student = await storage.getStudent(studentId);
+      if (!student) {
+        const err = new Error('Student not found');
+        err.statusCode = 404;
+        throw err;
+      }
+      const homework = await storage.getHomework(studentId, homeworkId);
+      if (!homework) {
+        const err = new Error('Homework not found');
+        err.statusCode = 404;
+        throw err;
+      }
+
+      const pdfBuffer = await generateHomeworkPDF(student, homework);
+      
+      const trMap = { 'ç': 'c', 'ğ': 'g', 'ı': 'i', 'ö': 'o', 'ş': 's', 'ü': 'u', 'Ç': 'C', 'Ğ': 'G', 'İ': 'I', 'Ö': 'O', 'Ş': 'S', 'Ü': 'U' };
+      const safeName = student.name
+        .split('')
+        .map(char => trMap[char] || char)
+        .join('')
+        .replace(/\s+/g, '-')
+        .replace(/[^a-zA-Z0-9-_]/g, '');
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="odev-degerlendirme-${safeName}.pdf"`);
+      res.send(pdfBuffer);
     })
   );
 

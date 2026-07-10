@@ -4,3 +4,4 @@ data/students/
 data/students.json
 dist/
 *.log
+*.pdf

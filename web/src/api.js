@@ -18,11 +18,20 @@ export async function listStudents() {
   return handleResponse(res);
 }
 
-export async function createStudent(name) {
+export async function createStudent(name, phone = '') {
   const res = await fetch('/api/students', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, phone }),
+  });
+  return handleResponse(res);
+}
+
+export async function updateStudent(studentId, { name, phone }) {
+  const res = await fetch(`/api/students/${studentId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, phone }),
   });
   return handleResponse(res);
 }
@@ -55,6 +64,34 @@ export async function saveEvaluation(studentId, homeworkId, { questions, teacher
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ questions, teacherComment }),
+  });
+  return handleResponse(res);
+}
+
+export async function archiveStudent(studentId) {
+  const res = await fetch(`/api/students/${studentId}/archive`, {
+    method: 'POST',
+  });
+  return handleResponse(res);
+}
+
+export async function deleteStudent(studentId) {
+  const res = await fetch(`/api/students/${studentId}`, {
+    method: 'DELETE',
+  });
+  return handleResponse(res);
+}
+
+export async function deleteEvaluation(studentId, homeworkId) {
+  const res = await fetch(`/api/evaluations/${studentId}/${homeworkId}`, {
+    method: 'DELETE',
+  });
+  return handleResponse(res);
+}
+
+export async function clearAllEvaluations(studentId) {
+  const res = await fetch(`/api/evaluations/${studentId}`, {
+    method: 'DELETE',
   });
   return handleResponse(res);
 }

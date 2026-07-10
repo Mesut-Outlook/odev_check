@@ -48,18 +48,49 @@ async function writeStudents(students) {
   await fs.writeFile(studentsFile(), JSON.stringify(students, null, 2), 'utf-8');
 }
 
-async function createStudent(name) {
-  const trimmed = (name || '').trim();
-  if (!trimmed) {
+async function createStudent(name, phone = '') {
+  const trimmedName = (name || '').trim();
+  if (!trimmedName) {
     const err = new Error('Student name is required');
     err.statusCode = 400;
     throw err;
   }
+  const trimmedPhone = (phone || '').trim();
   const students = await readStudents();
-  const student = { id: randomUUID(), name: trimmed, createdAt: new Date().toISOString() };
+  const student = {
+    id: randomUUID(),
+    name: trimmedName,
+    phone: trimmedPhone,
+    createdAt: new Date().toISOString(),
+  };
   students.push(student);
   await writeStudents(students);
   return student;
+}
+
+async function updateStudent(studentId, { name, phone }) {
+  assertValidId(studentId, 'studentId');
+  const students = await readStudents();
+  const idx = students.findIndex((s) => s.id === studentId);
+  if (idx === -1) {
+    const err = new Error('Student not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  if (name !== undefined) {
+    const trimmedName = (name || '').trim();
+    if (!trimmedName) {
+      const err = new Error('Student name is required');
+      err.statusCode = 400;
+      throw err;
+    }
+    students[idx].name = trimmedName;
+  }
+  if (phone !== undefined) {
+    students[idx].phone = (phone || '').trim();
+  }
+  await writeStudents(students);
+  return students[idx];
 }
 
 async function getStudent(studentId) {
@@ -200,8 +231,53 @@ async function getImagePath(studentId, homeworkId, index) {
   return path.join(dir, `image-${entry.index}.${entry.ext}`);
 }
 
+async function toggleArchiveStudent(studentId) {
+  assertValidId(studentId, 'studentId');
+  const students = await readStudents();
+  const idx = students.findIndex((s) => s.id === studentId);
+  if (idx === -1) {
+    const err = new Error('Student not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  students[idx].archived = !students[idx].archived;
+  await writeStudents(students);
+  return students[idx];
+}
+
+async function deleteStudent(studentId) {
+  assertValidId(studentId, 'studentId');
+  const students = await readStudents();
+  const filtered = students.filter((s) => s.id !== studentId);
+  if (students.length === filtered.length) {
+    const err = new Error('Student not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  await writeStudents(filtered);
+  const studentDir = path.join(studentsDir(), studentId);
+  await fs.rm(studentDir, { recursive: true, force: true });
+}
+
+async function deleteHomework(studentId, homeworkId) {
+  assertValidId(studentId, 'studentId');
+  assertValidId(homeworkId, 'homeworkId');
+  const dir = homeworkDirFor(studentId, homeworkId);
+  await fs.rm(dir, { recursive: true, force: true });
+}
+
+async function clearAllHomeworks(studentId) {
+  assertValidId(studentId, 'studentId');
+  const dir = homeworksDirFor(studentId);
+  await fs.rm(dir, { recursive: true, force: true });
+  await fs.mkdir(dir, { recursive: true });
+}
+
 export {
   createStudent,
+  updateStudent,
+  toggleArchiveStudent,
+  deleteStudent,
   readStudents,
   getStudent,
   createHomework,
@@ -210,4 +286,6 @@ export {
   saveEvaluation,
   getImagePath,
   summarize,
+  deleteHomework,
+  clearAllHomeworks,
 };
